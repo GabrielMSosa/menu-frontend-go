@@ -10,15 +10,33 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/swag/example/basic/docs"
+	eureka "github.com/xuanbo/eureka-client"
 )
 
 func main() {
 	//abrimos la conexion con la DB
-	db, err := sql.Open("mysql", "root:root@tcp(127.0.0.1:3306)/bootdb")
+	db, err := sql.Open("mysql", "root:root@tcp(my-db:3306)/bootdb")
 	if err != nil {
 		panic(err)
 	}
-
+	// create eureka client
+	client := eureka.NewClient(&eureka.Config{
+		DefaultZone:           "http://host.docker.internal:8761/eureka/",
+		App:                   "menu-frontend-go",
+		Port:                  8080,
+		RenewalIntervalInSecs: 10,
+		DurationInSecs:        30,
+		Metadata: map[string]interface{}{
+			"VERSION":              "0.1.0",
+			"NODE_GROUP_ID":        0,
+			"PRODUCT_CODE":         "DEFAULT",
+			"PRODUCT_VERSION_CODE": "DEFAULT",
+			"PRODUCT_ENV_CODE":     "DEFAULT",
+			"SERVICE_VERSION_CODE": "DEFAULT",
+		},
+	})
+	// start client, register、heartbeat、refresh
+	client.Start()
 	//inicializamos el server en gin
 	eng := gin.New()
 	//definimos los middleware manualmente porque vamos a usar uno custom
@@ -32,7 +50,7 @@ func main() {
 
 	router := routes.NewRouter(eng, db)
 	router.MapRoutes()
-	if err := eng.Run("localhost:8080"); err != nil {
+	if err := eng.Run(); err != nil {
 		panic(err)
 	}
 
